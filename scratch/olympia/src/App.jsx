@@ -2,10 +2,10 @@ import { useState } from 'react';
 import './App.css';
 
 const ROWS = [
-  { id: 1, chars: ['Đ', 'O', 'À', 'N', 'V', 'I', 'Ê', 'N'], length: 8, answer: 'ĐOÀN VIÊN' },
-  { id: 2, chars: ['T', 'Ư', 'Ơ', 'N', 'G', 'L', 'A', 'I'], length: 8, answer: 'TƯƠNG LAI' },
-  { id: 3, chars: ['N', 'Ă', 'M', 'X', 'U', 'N', 'G', 'K', 'Í', 'C', 'H'], length: 11, answer: 'NĂM XUNG KÍCH' },
-  { id: 4, chars: ['S', 'Á', 'U', 'K', 'H', 'Á', 'T', 'V', 'Ọ', 'N', 'G'], length: 11, answer: 'SÁU KHÁT VỌNG' },
+  { id: 1, chars: ['N', 'Ă', 'M'], length: 3, answer: 'NĂM' },
+  { id: 2, chars: ['X', 'U', 'N', 'G', 'K', 'Í', 'C', 'H'], length: 8, answer: 'XUNG KÍCH' },
+  { id: 3, chars: ['S', 'Á', 'U'], length: 3, answer: 'SÁU' },
+  { id: 4, chars: ['K', 'H', 'Á', 'T', 'V', 'Ọ', 'N', 'G'], length: 8, answer: 'KHÁT VỌNG' },
 ];
 
 const ROW_DETAILS = {
@@ -67,7 +67,7 @@ const QUESTION_POOL = [
     correct: 3,
   },
   {
-    q: 'Bậc học tiếp theo sau THPT mà nhiều thanh niên hướng tới?',
+    q: 'Bậc học tiếp theo sau THPT mà many thanh niên hướng tới?',
     choices: ['Cao đẳng', 'Trung cấp', 'Đại học', 'Nghề'],
     correct: 2,
   },
@@ -231,10 +231,10 @@ const QUESTION_POOL = [
     choices: ['Số', 'Xanh', 'Trẻ', 'Mới'],
     correct: 0,
   },
-
 ];
 
 const LABELS = ['A', 'B', 'C', 'D'];
+const OBSTACLE_ANSWER = 'NĂM XUNG KÍCH, SÁU KHÁT VỌNG';
 
 function App() {
   const [currentQIdx, setCurrentQIdx] = useState(0);
@@ -243,18 +243,23 @@ function App() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [guessingRow, setGuessingRow] = useState(false);
   const [rowInputValue, setRowInputValue] = useState('');
-  const [expandedRow, setExpandedRow] = useState(null); // which row's dropdown is open
+  const [expandedRow, setExpandedRow] = useState(null);
 
-  const [currentTeam, setCurrentTeam] = useState(0); // not numbered, just generic
+  const [currentTeam, setCurrentTeam] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [selectedChoice, setSelectedChoice] = useState(null);
   const [answered, setAnswered] = useState(false);
   const [gameOver, setGameOver] = useState(false);
 
-  const normalizeString = (str) => str.replace(/\s+/g, '').toUpperCase();
+  const [guessingObstacle, setGuessingObstacle] = useState(false);
+  const [obstacleInput, setObstacleInput] = useState('');
+  const [obstacleSolved, setObstacleSolved] = useState(false);
+
+  const normalizeString = (str) => str.replace(/[^a-zA-ZÀ-ỹ0-9]/g, '').toUpperCase();
 
   const nextQuestion = () => {
+    if (obstacleSolved) return;
     if (currentQIdx + 1 >= QUESTION_POOL.length) {
       setGameOver(true);
       setFeedback('ĐÃ HẾT CÂU HỎI! GAME KẾT THÚC.');
@@ -265,27 +270,24 @@ function App() {
     setSelectedChoice(null);
     setAnswered(false);
     setWrongCount(0);
-    setCurrentTeam(prev => prev + 1); // just increment, we don't display a number
+    setCurrentTeam(prev => prev + 1);
   };
 
   const handleChoiceClick = (choiceIdx) => {
-    if (answered || gameOver) return;
+    if (answered || gameOver || obstacleSolved) return;
 
     setSelectedChoice(choiceIdx);
     setAnswered(true);
 
     const currentQ = QUESTION_POOL[currentQIdx];
     if (choiceIdx === currentQ.correct) {
-      // Correct!
       setTokens(prev => prev + 1);
       setFeedback('CHÍNH XÁC! ĐƯỢC 1 LƯỢT MỞ Ô.');
       setTimeout(() => {
-        nextQuestion();
-      }, 2500);
+        setFeedback('Hãy chọn 1 ô chữ để mở!');
+      }, 2000);
     } else {
-      // Wrong
       if (wrongCount === 0) {
-        // First wrong: pass to next team
         setFeedback('SAI RỒI! Chuyển sang nhóm tiếp theo.');
         setWrongCount(1);
         setCurrentTeam(prev => prev + 1);
@@ -295,7 +297,6 @@ function App() {
           setFeedback('Nhóm tiếp theo, xin mời trả lời!');
         }, 2000);
       } else {
-        // Second wrong: skip question
         setFeedback(`SAI RỒI! Bỏ qua câu hỏi này. Đáp án đúng: ${currentQ.choices[currentQ.correct]}`);
         setTimeout(() => {
           nextQuestion();
@@ -305,17 +306,24 @@ function App() {
   };
 
   const handleCircleClick = (rowId, colIdx) => {
-    if (tokens <= 0 || gameOver) return;
+    if (tokens <= 0 || gameOver || obstacleSolved) return;
     const key = `${rowId}-${colIdx}`;
     if (revealedCells[key]) return;
     setRevealedCells(prev => ({ ...prev, [key]: true }));
     setTokens(prev => prev - 1);
-    setFeedback(`Đã mở 1 ô! Còn ${tokens - 1} lượt mở ô.`);
+    setFeedback(`Đã mở ô ở hàng ${rowId}!`);
+    setTimeout(() => {
+      if (tokens - 1 <= 0) {
+        nextQuestion();
+      } else {
+        setFeedback(`Còn ${tokens - 1} lượt mở ô.`);
+      }
+    }, 2000);
   };
 
   const handleRowGuess = (e) => {
     e.preventDefault();
-    if (!rowInputValue.trim() || !selectedRow) return;
+    if (!rowInputValue.trim() || !selectedRow || obstacleSolved) return;
     const row = ROWS.find(r => r.id === selectedRow);
     if (normalizeString(rowInputValue) === normalizeString(row.answer)) {
       const newRevealed = { ...revealedCells };
@@ -324,7 +332,7 @@ function App() {
       }
       setRevealedCells(newRevealed);
       setTokens(prev => prev + 1);
-      setFeedback(`CHÍNH XÁC hàng ngang số ${selectedRow}! +1 lượt mở ô.`);
+      setFeedback(`CHÍNH XÁC hàng số ${selectedRow}! +1 lượt mở ô.`);
       setTimeout(() => {
         setSelectedRow(null);
         setGuessingRow(false);
@@ -332,7 +340,29 @@ function App() {
         setFeedback('');
       }, 2500);
     } else {
-      setFeedback('SAI RỒI! Đáp án hàng ngang chưa đúng.');
+      setFeedback('SAI RỒI! Đáp án chưa đúng.');
+    }
+  };
+
+  const handleObstacleGuess = (e) => {
+    e.preventDefault();
+    if (!obstacleInput.trim() || obstacleSolved) return;
+
+    if (normalizeString(obstacleInput) === normalizeString(OBSTACLE_ANSWER)) {
+      const newRevealed = { ...revealedCells };
+      ROWS.forEach(row => {
+        for (let i = 0; i < row.length; i++) {
+          newRevealed[`${row.id}-${i}`] = true;
+        }
+      });
+      setRevealedCells(newRevealed);
+      setObstacleSolved(true);
+      setGameOver(true);
+      setFeedback('CHÚC MỪNG! BẠN ĐÃ GIẢI ĐƯỢC CHƯỚNG NGẠI VẬT: ' + OBSTACLE_ANSWER);
+      setGuessingObstacle(false);
+    } else {
+      setFeedback('SAI RỒI! Đó không phải là đáp án chướng ngại vật.');
+      setTimeout(() => setFeedback(''), 3000);
     }
   };
 
@@ -357,31 +387,59 @@ function App() {
       </header>
 
       <main className="game-main">
-        {/* Left: Picture Puzzle */}
         <div className="left-panel">
           <div className="image-container">
             <img
               src="/vietnam_youth_future.png"
               alt="Hidden"
-              className="hidden-image"
+              className={`hidden-image ${obstacleSolved ? 'revealed' : ''}`}
               onError={(e) => {
                 e.target.onerror = null;
                 e.target.src = "https://images.unsplash.com/photo-1543269865-cbf427effbad?q=80&w=2070&auto=format&fit=crop";
               }}
             />
-            {!isRowRevealed(1) && <div className="puzzle-piece piece-1">1</div>}
-            {!isRowRevealed(2) && <div className="puzzle-piece piece-2">2</div>}
-            {!isRowRevealed(3) && <div className="puzzle-piece piece-3">3</div>}
-            {!isRowRevealed(4) && <div className="puzzle-piece piece-4">4</div>}
+            {!isRowRevealed(1) && !obstacleSolved && <div className="puzzle-piece piece-1">1</div>}
+            {!isRowRevealed(2) && !obstacleSolved && <div className="puzzle-piece piece-2">2</div>}
+            {!isRowRevealed(3) && !obstacleSolved && <div className="puzzle-piece piece-3">3</div>}
+            {!isRowRevealed(4) && !obstacleSolved && <div className="puzzle-piece piece-4">4</div>}
+            
+            {obstacleSolved && (
+              <div className="obstacle-solved-overlay">
+                <div className="solved-text">{OBSTACLE_ANSWER}</div>
+              </div>
+            )}
+          </div>
+          
+          <div className="obstacle-actions">
+            {!obstacleSolved && !gameOver && (
+              <button 
+                className="solve-obstacle-btn"
+                onClick={() => setGuessingObstacle(true)}
+              >
+                GIẢI CHƯỚNG NGẠI VẬT
+              </button>
+            )}
+            {guessingObstacle && (
+              <form onSubmit={handleObstacleGuess} className="obstacle-guess-form">
+                <input
+                  type="text"
+                  value={obstacleInput}
+                  onChange={(e) => setObstacleInput(e.target.value)}
+                  placeholder="Nhập chướng ngại vật..."
+                  autoFocus
+                />
+                <div className="form-buttons">
+                   <button type="submit">XÁC NHẬN</button>
+                   <button type="button" onClick={() => setGuessingObstacle(false)}>HỦY</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
 
-        {/* Right: Rows */}
         <div className="right-panel">
           <div className="obstacle-header-container">
-            <div className="obstacle-header">
-              VƯỢT CHƯỚNG NGẠI VẬT
-            </div>
+            <div className="obstacle-header">VƯỢT CHƯỚNG NGẠI VẬT</div>
           </div>
           <div className="rows-area">
             {ROWS.map((row) => (
@@ -390,7 +448,6 @@ function App() {
                   className={`row-container ${selectedRow === row.id ? 'selected' : ''}`}
                   onClick={() => {
                     if (isRowRevealed(row.id) && ROW_DETAILS[row.id]) {
-                      // Toggle dropdown
                       setExpandedRow(expandedRow === row.id ? null : row.id);
                       return;
                     }
@@ -420,7 +477,6 @@ function App() {
                   </div>
                 </div>
 
-                {/* Expandable dropdown for rows with details */}
                 {expandedRow === row.id && ROW_DETAILS[row.id] && (
                   <div className="row-dropdown">
                     <div className="dropdown-title">{ROW_DETAILS[row.id].title}</div>
@@ -436,7 +492,6 @@ function App() {
               </div>
             ))}
 
-            {/* Row guess controls */}
             {selectedRow && !guessingRow && (
               <button
                 className="guess-row-btn"
@@ -461,13 +516,10 @@ function App() {
           </div>
         </div>
 
-        {/* Bottom: Question Box with ABCD */}
         <div className="question-box">
           {currentQ && !gameOver ? (
             <>
-              <div className="q-header">
-                CÂU HỎI {currentQIdx + 1}
-              </div>
+              <div className="q-header">CÂU HỎI {currentQIdx + 1}</div>
               <div className="q-text">{currentQ.q}</div>
               <div className="choices-grid">
                 {currentQ.choices.map((choice, idx) => {
@@ -498,12 +550,7 @@ function App() {
         </div>
       </main>
 
-      {/* Feedback bar */}
-      {feedback && (
-        <div className="feedback-bar">
-          {feedback}
-        </div>
-      )}
+      {feedback && <div className="feedback-bar">{feedback}</div>}
     </div>
   );
 }
