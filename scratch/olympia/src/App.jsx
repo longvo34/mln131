@@ -35,7 +35,7 @@ const ROW_DETAILS = {
 const NUM_TEAMS = 5;
 
 // All questions now have 4 choices (A, B, C, D) with the correct answer index
-const QUESTION_POOL_RANDOM = [
+const QUESTION_POOL = [
   {
     q: 'Xung kích trong đổi mới sáng tạo, khởi nghiệp, lập nghiệp và xây dựng _____ số là 1 trong 5 xung kích?',
     choices: ['Kinh tế', 'Xã hội', 'Văn hóa', 'Giáo dục'],
